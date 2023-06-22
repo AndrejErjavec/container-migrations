@@ -28,7 +28,7 @@ public class Node {
         }
     }
 
-    public int getLoad() {
+    public int getCpuUsage() {
         int load = 0;
         for (int i = 0; i < this.containers.size(); i++) {
             load += containers.get(i).getCpuUsage();
@@ -57,7 +57,7 @@ public class Node {
     public void print() {
         // containers.forEach(container -> System.out.print(container.getCpuUsage() + "|"));
         System.out.print(containers.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
-        System.out.println(" Load: " + this.getLoad());
+        System.out.println(" Load: " + this.getCpuUsage());
     }
 
     public ArrayList<Container> getContainers() {

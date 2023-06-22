@@ -4,8 +4,8 @@ public class Main {
     public static void main(String[] args) {
 
         Network n = new Network(NETWORK_SIZE);
-        n.print();
-        n.migrationPlan1();
-        n.print();
+        // n.print();
+        n.migrationPlanImproved();
+        // n.print();
     }
 }
