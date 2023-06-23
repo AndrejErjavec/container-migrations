@@ -1,15 +1,15 @@
-public class Container {
-    private int CPU_USAGE;
+import java.util.UUID;
 
-    public Container (int cpu_usage) {
-        this.CPU_USAGE = cpu_usage;
+public class Container {
+    private int cpuUsage;
+    public String id;
+
+    public Container (int cpuUsage) {
+        this.id = UUID.randomUUID().toString();
+        this.cpuUsage = cpuUsage;
     }
 
     public int getCpuUsage() {
-        return CPU_USAGE;
-    }
-
-    public void setCpuUsage(int CPU_USAGE) {
-        this.CPU_USAGE = CPU_USAGE;
+        return this.cpuUsage;
     }
 }

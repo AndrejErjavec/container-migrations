@@ -1,3 +1,4 @@
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.stream.Collectors;
@@ -7,10 +8,12 @@ public class Network {
     public ArrayList<Node> nodes;
     public float averageLoad;
     public float loadStdDev;
+    public ArrayList<Migration> migrationPlan;
 
     public Network(int size) {
         this.size = size;
         this.nodes = new ArrayList<Node>();
+        this.migrationPlan = new ArrayList<Migration>();
 
         for (int i = 0; i< this.size; i++) {
             this.nodes.add(new Node());
@@ -57,14 +60,14 @@ public class Network {
         return sum / nodes.size();
     }
 
-    private void migrate(Container ct, Node src, Node dst) {
+    private void simulateMigration(Container ct, Node src, Node dst) {
         src.removeContainer(ct);
         dst.addContainer(ct);
         // System.out.println("Moved container with CPU usage " + ct.getCpuUsage() + " from node " + nodes.indexOf(src) + " to node " + nodes.indexOf(dst));
     }
 
     // existing migration plan algorithm
-    public void migrationPlan() {
+    public void generateMigrationPlan() {
         Node maxLoadedNode = getMaxLoadedNode();
         Node minLoadedNode = getMinLoadedNode();
         Container ctToMigrate = maxLoadedNode.getMaxLoaded();
@@ -72,12 +75,14 @@ public class Network {
         int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
         int nextLoadDelta = Math.abs(maxLoadedNode.getCpuUsage() - ctToMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + ctToMigrate.getCpuUsage());
         if (loadDelta > nextLoadDelta) {
-            migrate(ctToMigrate, maxLoadedNode, minLoadedNode);
+            // simulateMigration(ctToMigrate, maxLoadedNode, minLoadedNode);
+            migrationPlan.add(new Migration(ctToMigrate.id, maxLoadedNode.id, minLoadedNode.id));
         }
     }
 
-    public void migrationPlanImproved() {
-        print();
+    public void generateMigrationPlanImproved() {
+        printState();
+        float currentDev = getLoadStdDev();
         for (int n = 0; n < 50; n++) {
             Node maxLoadedNode = getMaxLoadedNode();
             Node minLoadedNode = getMinLoadedNode();
@@ -93,9 +98,10 @@ public class Network {
             // System.out.println(migrationCandidates.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
 
             int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
-            float prevDev = getLoadStdDev();
+
             int prevDiff = Integer.MAX_VALUE;
 
+            // find best candidate container to migrate
             for (int i = 0; i < migrationCandidates.size(); i++) {
                 Container candidate = migrationCandidates.get(i);
                 int nextLoadDelta = Math.abs(maxLoadedNode.getCpuUsage() - candidate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + candidate.getCpuUsage());
@@ -105,26 +111,40 @@ public class Network {
                 }
                 else {
                     Container toMigrate = migrationCandidates.get(i-1);
-                    migrate (toMigrate, maxLoadedNode, minLoadedNode);
+                    migrationPlan.add(new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id));
+                    simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
                     break;
                 }
             }
-            print();
-            float currentDev = getLoadStdDev();
-            if (currentDev <= prevDev) {
-                prevDev = currentDev;
+            float nextDev = getLoadStdDev();
+            if (nextDev > currentDev) {
+                migrationPlan.remove(migrationPlan.size()-1);
+                return;
             }
-            else break;
+            else {
+                printState();
+                currentDev = nextDev;
+            }
             // System.out.println("Std dev: " + getLoadStdDev());
         }
     }
 
-    public void print() {
+    public void executeMigrationPlan() {
+        // ...
+    }
+
+    public void printState() {
         for (int i = 0; i < nodes.size(); i++) {
             System.out.print("Node " + i + ": ");
             nodes.get(i).print();
         }
         System.out.println("Std dev: " + getLoadStdDev());
         System.out.println("--------------------------------");
+    }
+
+    public void printMigrationPlan() {
+        migrationPlan.forEach(migration -> {
+            migration.print();
+        });
     }
 }

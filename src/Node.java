@@ -1,17 +1,21 @@
 import java.sql.Array;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class Node {
+    public String id;
     private ArrayList<Container> containers;
     private final static int max_containers = 10;
     private final static int max_container_cpu_usage = 50;
 
-    public Node(ArrayList<Container> containers) {
+    public Node(String id, ArrayList<Container> containers) {
+        this.id = id;
         this.containers = containers;
     }
 
     public Node() {
+        this.id = UUID.randomUUID().toString();
         this.containers = new ArrayList<Container>();
 
         long n = Math.round(Math.random() * max_containers);
@@ -20,9 +24,10 @@ public class Node {
             for (int j = 0; j < this.containers.size(); j++) {
                 load += containers.get(j).getCpuUsage();
             }
-            int cpu_usage = (int)Math.round(Math.random() * max_container_cpu_usage);
-            if (load + cpu_usage <= 100) {
-                this.containers.add(new Container(cpu_usage));
+            int cpuUsage = (int)Math.round(Math.random() * max_container_cpu_usage);
+            String cid = UUID.randomUUID().toString();
+            if (load + cpuUsage <= 100) {
+                this.containers.add(new Container(cpuUsage));
             }
             else break;
         }
