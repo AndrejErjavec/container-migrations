@@ -1,10 +1,15 @@
+import com.sun.source.tree.ArrayAccessTree;
+
+import java.sql.Array;
+import java.util.ArrayList;
+
 public class Main {
-    public static int NETWORK_SIZE = 5;
+    public static int NETWORK_SIZE = 20;
 
     public static void main(String[] args) {
-
-        Network n = new Network(NETWORK_SIZE);
-        n.generateMigrationPlanImproved();
-        n.printMigrationPlan();
+        Chain chain = new Chain();
+        Network n = new Network(NETWORK_SIZE, chain);
+        n.run();
+        chain.print();
     }
 }
