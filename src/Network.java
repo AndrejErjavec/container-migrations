@@ -1,6 +1,10 @@
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toCollection;
 
 public class Network {
     public int size;
@@ -8,19 +12,20 @@ public class Network {
     public ArrayList<Node> nodes;
     private static float loadStdDev;
     private static float loadStdDevPrevBlock;
+    private static List<Node> snapshot;
 
     public Network(int size, Chain chain) {
         this.size = size;
-        this.nodes = new ArrayList<Node>();
         this.chain = chain;
-        // this.migrationPlan = new ArrayList<Migration>();
 
+        this.nodes = new ArrayList<Node>();
         for (int i = 0; i< this.size; i++) {
             this.nodes.add(new Node());
         }
 
+        snapshot = List.copyOf(nodes);
         loadStdDev = this.getLoadStdDev();
-        loadStdDevPrevBlock = this.getLoadStdDev();
+        loadStdDevPrevBlock = Float.MAX_VALUE;
     }
 
     private Node getMaxLoadedNode(ArrayList<Node> nodes) {
@@ -66,6 +71,20 @@ public class Network {
         // System.out.println("Moved container with CPU usage " + ct.getCpuUsage() + " from node " + nodes.indexOf(src) + " to node " + nodes.indexOf(dst));
     }
 
+    private void takeSnapshot(ArrayList<Node> nodes) {
+        // snapshot = List.copyOf(nodes);
+        snapshot = new ArrayList<>();
+        // snapshot.clear();
+        nodes.forEach(node -> snapshot.add(node.copy()));
+    }
+
+    private void restorePrevoiusState() {
+        nodes.clear();
+        snapshot.forEach(node -> {
+            Node n = new Node(node.id, new ArrayList<Container>(node.getContainers()));
+            nodes.add(n);
+        });
+    }
 
     /** existing migration plan algorithm
 
@@ -88,17 +107,19 @@ public class Network {
         ArrayList<Migration> migrationPlan = new ArrayList<Migration>();
         ArrayList<Node> availableNodes = new ArrayList<>();
         float dev = getLoadStdDev();
-        float devPrev = getLoadStdDev();
+        float devPrevious = getLoadStdDev();
 
-        nodes.forEach(node -> availableNodes.add(node));
+        nodes.forEach(node -> {
+            availableNodes.add(node);
+        });
 
         // printState();
 
-        while (dev <= devPrev && availableNodes.size() > 0) {
+        while (dev <= devPrevious && availableNodes.size() > 0) {
             Node maxLoadedNode = getMaxLoadedNode(availableNodes);
             Node minLoadedNode = getMinLoadedNode(availableNodes);
 
-            ArrayList<Container> migrationCandidates = maxLoadedNode.getContainers();
+            List<Container> migrationCandidates = maxLoadedNode.getContainers();
             migrationCandidates.sort(new Comparator<Container>() {
                 @Override
                 public int compare(Container ct1, Container ct2) {
@@ -109,7 +130,6 @@ public class Network {
             // System.out.println(migrationCandidates.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
 
             int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
-
             int prevDiff = Integer.MAX_VALUE;
 
             // find the best candidate container to migrate
@@ -123,6 +143,8 @@ public class Network {
                 }
                 // always true - min and max nodes taken from available nodes
                 else if (availableNodes.contains(maxLoadedNode) && availableNodes.contains(minLoadedNode)) {
+                    takeSnapshot(nodes);
+                    // perform migration
                     Container toMigrate = migrationCandidates.get(i-1);
                     migrationPlan.add(new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id));
                     simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
@@ -136,23 +158,30 @@ public class Network {
                 }
             }
 
-            devPrev = dev;
+            devPrevious = dev;
             dev = getLoadStdDev();
-            if (dev <= devPrev) {
-                // printState();
-                System.out.println("Std dev: " + getLoadStdDev());
+            if (dev <= devPrevious) {
+                System.out.println("Std dev: " + dev);
+            }
+            else {
+                System.out.println("Std dev extra: " + dev);
             }
         }
+        System.out.println("Standard deviation before restore: " + getLoadStdDev());
+        restorePrevoiusState();
+        System.out.println("Standard deviation after restore: " + getLoadStdDev());
         System.out.println("------- END OF BLOCK -------");
         migrationPlan.remove(migrationPlan.size()-1);
         return migrationPlan;
     }
 
     public void run() {
-        while (loadStdDev <= loadStdDevPrevBlock) {
+        while (loadStdDev < loadStdDevPrevBlock) {
             loadStdDevPrevBlock = loadStdDev;
             ArrayList<Migration> migrationPlan = generateMigrationPlan();
-            chain.addBlock(new Block(migrationPlan));
+            if (migrationPlan.size() > 0) {
+                chain.addBlock(new Block(migrationPlan));
+            }
             loadStdDev = getLoadStdDev();
         }
     }

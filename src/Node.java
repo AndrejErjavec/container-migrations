@@ -1,15 +1,16 @@
 import java.sql.Array;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class Node {
     public String id;
-    private ArrayList<Container> containers;
+    private List<Container> containers;
     private final static int max_containers = 10;
     private final static int max_container_cpu_usage = 50;
 
-    public Node(String id, ArrayList<Container> containers) {
+    public Node(String id, List<Container> containers) {
         this.id = id;
         this.containers = containers;
     }
@@ -25,7 +26,6 @@ public class Node {
                 load += containers.get(j).getCpuUsage();
             }
             int cpuUsage = (int)Math.round(Math.random() * max_container_cpu_usage);
-            String cid = UUID.randomUUID().toString();
             if (load + cpuUsage <= 100) {
                 this.containers.add(new Container(cpuUsage));
             }
@@ -59,13 +59,17 @@ public class Node {
         this.containers.add(container);
     }
 
+    public Node copy() {
+     return new Node(this.id, List.copyOf(this.containers));
+    }
+
     public void print() {
         // containers.forEach(container -> System.out.print(container.getCpuUsage() + "|"));
         System.out.print(containers.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
         System.out.println(" Load: " + this.getCpuUsage());
     }
 
-    public ArrayList<Container> getContainers() {
+    public List<Container> getContainers() {
         return containers;
     }
 }
