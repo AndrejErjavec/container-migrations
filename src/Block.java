@@ -10,4 +10,19 @@ public class Block {
         this.migrationPlan = migrationPlan;
     }
 
+    public Block() {
+        this.id = UUID.randomUUID().toString();
+        this.migrationPlan = new ArrayList<>();
+    }
+
+    public void addMigrationPlan(ArrayList<Migration> migrationPlan) {
+        this.migrationPlan = migrationPlan;
+    }
+
+    public void printMigrationPlan() {
+        migrationPlan.forEach(migration -> {
+            migration.print();
+        });
+    }
+
 }

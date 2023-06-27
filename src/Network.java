@@ -1,22 +1,28 @@
+import utils.CsvUtils;
+
 import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.toCollection;
 
 public class Network {
     public int size;
     public Chain chain;
+    public Block currentBlock;
     public ArrayList<Node> nodes;
     private static float loadStdDev;
     private static float loadStdDevPrevBlock;
     private static List<Node> snapshot;
 
+    CsvUtils cu = new CsvUtils();
+    private static String csvFileName = "analysis/migrations.csv";
+
     public Network(int size, Chain chain) {
         this.size = size;
         this.chain = chain;
+        this.currentBlock = new Block();
 
         this.nodes = new ArrayList<Node>();
         for (int i = 0; i< this.size; i++) {
@@ -26,6 +32,9 @@ public class Network {
         snapshot = List.copyOf(nodes);
         loadStdDev = this.getLoadStdDev();
         loadStdDevPrevBlock = Float.MAX_VALUE;
+
+        String[] headers = {"block", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU"};
+        cu.initCsv(headers, csvFileName);
     }
 
     private Node getMaxLoadedNode(ArrayList<Node> nodes) {
@@ -133,6 +142,8 @@ public class Network {
             int prevDiff = Integer.MAX_VALUE;
 
             // find the best candidate container to migrate
+            Container toMigrate = null;
+            Migration migration = null;
             for (int i = 0; i < migrationCandidates.size(); i++) {
                 Container candidate = migrationCandidates.get(i);
                 int nextLoadDelta = Math.abs(maxLoadedNode.getCpuUsage() - candidate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + candidate.getCpuUsage());
@@ -145,11 +156,13 @@ public class Network {
                 else if (availableNodes.contains(maxLoadedNode) && availableNodes.contains(minLoadedNode)) {
                     takeSnapshot(nodes);
                     // perform migration
-                    Container toMigrate = migrationCandidates.get(i-1);
-                    migrationPlan.add(new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id));
+                    toMigrate = migrationCandidates.get(i-1);
+                    migration = new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
+                    migrationPlan.add(migration);
                     simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
                     availableNodes.remove(maxLoadedNode);
                     availableNodes.remove(minLoadedNode);
+
                     break;
                 }
                 else {
@@ -162,6 +175,7 @@ public class Network {
             dev = getLoadStdDev();
             if (dev <= devPrevious) {
                 System.out.println("Std dev: " + dev);
+                writeMigrationsToCsv(migration, toMigrate);
             }
             else {
                 System.out.println("Std dev extra: " + dev);
@@ -180,7 +194,10 @@ public class Network {
             loadStdDevPrevBlock = loadStdDev;
             ArrayList<Migration> migrationPlan = generateMigrationPlan();
             if (migrationPlan.size() > 0) {
-                chain.addBlock(new Block(migrationPlan));
+                currentBlock.addMigrationPlan(migrationPlan);
+                // Block newBlock = new Block(migrationPlan);
+                chain.addBlock(currentBlock);
+                currentBlock = new Block();
             }
             loadStdDev = getLoadStdDev();
         }
@@ -188,6 +205,22 @@ public class Network {
 
     public void executeMigrationPlan() {
         // ...
+    }
+
+    private void writeMigrationsToCsv(Migration migration, Container container) {
+        // block, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stddevCPU, minCPU, maxCPU
+        String blockId = currentBlock.id;
+        String sourceNode = migration.source;
+        String destinationNode = migration.destination;
+        String containerID = migration.container;
+        String containerCPU = Integer.toString(container.getCpuUsage());
+        String averageCPU = Float.toString(getAverageLoad());
+        String stdDevCPU = Float.toString(getLoadStdDev());
+        String minCPU = Integer.toString(getMinLoadedNode(nodes).getCpuUsage());
+        String maxCPU = Integer.toString(getMaxLoadedNode(nodes).getCpuUsage());
+
+        String[] line = {blockId, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stdDevCPU, minCPU, maxCPU};
+        cu.writeLine(line, csvFileName);
     }
 
     public void printState() {
@@ -198,12 +231,4 @@ public class Network {
         System.out.println("Std dev: " + getLoadStdDev());
         System.out.println("--------------------------------");
     }
-
-    /*
-    public void printMigrationPlan() {
-        migrationPlan.forEach(migration -> {
-            migration.print();
-        });
-    }
-     */
 }
