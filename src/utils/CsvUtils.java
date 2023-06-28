@@ -8,7 +8,7 @@ import com.opencsv.CSVWriter;
 
 
 public class CsvUtils {
-    public void initCsv(String[] headers, String filePath) {
+    public static void initCsv(String[] headers, String filePath) {
         File file = new File(filePath);
 
         try {
@@ -23,7 +23,7 @@ public class CsvUtils {
         }
     }
 
-    public void writeLine(String[] line, String filePath) {
+    public static void writeLine(String[] line, String filePath) {
         File file = new File(filePath);
 
         try {

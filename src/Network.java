@@ -1,23 +1,23 @@
 import utils.CsvUtils;
-
-import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
-
 
 public class Network {
     public int size;
     public Chain chain;
     public Block currentBlock;
     public ArrayList<Node> nodes;
-    private static float loadStdDev;
-    private static float loadStdDevPrevBlock;
-    private static List<Node> snapshot;
+    private float loadStdDev;
+    private float loadStdDevPrevBlock;
+    private List<Node> snapshot;
 
-    CsvUtils cu = new CsvUtils();
-    private static String csvFileName = "analysis/migrations.csv";
+    // ------- configuration -------
+    private boolean multiMigrationsPerBlock = true;
+    private boolean outputCSV = false;
+
+    private String csvFilePath = "migrations.csv";
 
     public Network(int size, Chain chain) {
         this.size = size;
@@ -34,8 +34,9 @@ public class Network {
         loadStdDevPrevBlock = Float.MAX_VALUE;
 
         String[] headers = {"block", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU"};
-        cu.initCsv(headers, csvFileName);
+        CsvUtils.initCsv(headers, csvFilePath);
     }
+
 
     private Node getMaxLoadedNode(ArrayList<Node> nodes) {
         Node maxLoaded = nodes.get(0);
@@ -95,23 +96,32 @@ public class Network {
         });
     }
 
-    /** existing migration plan algorithm
-
-    public void generateMigrationPlan() {
-        Node maxLoadedNode = getMaxLoadedNode();
-        Node minLoadedNode = getMinLoadedNode();
-        Container ctToMigrate = maxLoadedNode.getMaxLoaded();
+    /**
+     * exsisting migration plan algorithm
+     * single migration per block
+     */
+    public ArrayList<Migration> generateMigrationPlanOld() {
+        Node maxLoadedNode = getMaxLoadedNode(nodes);
+        Node minLoadedNode = getMinLoadedNode(nodes);
+        Container toMigrate = maxLoadedNode.getMaxLoaded();
 
         int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
-        int nextLoadDelta = Math.abs(maxLoadedNode.getCpuUsage() - ctToMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + ctToMigrate.getCpuUsage());
+        int nextLoadDelta = Math.abs(maxLoadedNode.getCpuUsage() - toMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + toMigrate.getCpuUsage());
         if (loadDelta > nextLoadDelta) {
-            // simulateMigration(ctToMigrate, maxLoadedNode, minLoadedNode);
-            migrationPlan.add(new Migration(ctToMigrate.id, maxLoadedNode.id, minLoadedNode.id));
+            simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
+            ArrayList migrations = new ArrayList<>();
+            Migration migration = new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
+            migrations.add(migration);
+            if(outputCSV) { writeMigrationsToCsv(migration, toMigrate, csvFilePath); }
+            return migrations;
         }
+        return new ArrayList<>();
     }
 
-    */
-
+    /**
+     * new migration plan algorithm
+     * multiple migrations per block
+     */
     private ArrayList<Migration> generateMigrationPlan() {
         ArrayList<Migration> migrationPlan = new ArrayList<Migration>();
         ArrayList<Node> availableNodes = new ArrayList<>();
@@ -162,7 +172,6 @@ public class Network {
                     simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
                     availableNodes.remove(maxLoadedNode);
                     availableNodes.remove(minLoadedNode);
-
                     break;
                 }
                 else {
@@ -175,7 +184,7 @@ public class Network {
             dev = getLoadStdDev();
             if (dev <= devPrevious) {
                 System.out.println("Std dev: " + dev);
-                writeMigrationsToCsv(migration, toMigrate);
+                if(outputCSV) { writeMigrationsToCsv(migration, toMigrate, csvFilePath); }
             }
             else {
                 System.out.println("Std dev extra: " + dev);
@@ -192,10 +201,11 @@ public class Network {
     public void run() {
         while (loadStdDev < loadStdDevPrevBlock) {
             loadStdDevPrevBlock = loadStdDev;
-            ArrayList<Migration> migrationPlan = generateMigrationPlan();
+            ArrayList<Migration> migrationPlan;
+            if (multiMigrationsPerBlock) { migrationPlan = generateMigrationPlan(); }
+            else { migrationPlan = generateMigrationPlanOld(); }
             if (migrationPlan.size() > 0) {
                 currentBlock.addMigrationPlan(migrationPlan);
-                // Block newBlock = new Block(migrationPlan);
                 chain.addBlock(currentBlock);
                 currentBlock = new Block();
             }
@@ -207,7 +217,7 @@ public class Network {
         // ...
     }
 
-    private void writeMigrationsToCsv(Migration migration, Container container) {
+    private void writeMigrationsToCsv(Migration migration, Container container, String file) {
         // block, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stddevCPU, minCPU, maxCPU
         String blockId = currentBlock.id;
         String sourceNode = migration.source;
@@ -220,7 +230,7 @@ public class Network {
         String maxCPU = Integer.toString(getMaxLoadedNode(nodes).getCpuUsage());
 
         String[] line = {blockId, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stdDevCPU, minCPU, maxCPU};
-        cu.writeLine(line, csvFileName);
+        CsvUtils.writeLine(line, file);
     }
 
     public void printState() {
@@ -230,5 +240,19 @@ public class Network {
         }
         System.out.println("Std dev: " + getLoadStdDev());
         System.out.println("--------------------------------");
+    }
+
+    public void multiMigrationsPerBlock(boolean multiMigrationsPerBlock) {
+        this.multiMigrationsPerBlock = multiMigrationsPerBlock;
+    }
+
+    public void outputCSV(boolean outputCVS) {
+        this.outputCSV = outputCVS;
+    }
+
+    public void setCSVpath(String path) {
+        this.csvFilePath = path;
+        String[] headers = {"block", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU"};
+        CsvUtils.initCsv(headers, csvFilePath);
     }
 }
