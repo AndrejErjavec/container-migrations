@@ -1,6 +1,7 @@
 import java.sql.Array;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -26,6 +27,24 @@ public class Node {
                 load += containers.get(j).getCpuUsage();
             }
             int cpuUsage = (int)Math.round(Math.random() * max_container_cpu_usage);
+            if (load + cpuUsage <= 100) {
+                this.containers.add(new Container(cpuUsage));
+            }
+            else break;
+        }
+    }
+
+    public Node(int seed) {
+        this.id = UUID.randomUUID().toString();
+        this.containers = new ArrayList<Container>();
+
+        long n = new Random(seed).nextInt(max_containers);
+        for (int i = 0; i < n; i++) {
+            int load = 0;
+            for (int j = 0; j < this.containers.size(); j++) {
+                load += containers.get(j).getCpuUsage();
+            }
+            int cpuUsage = new Random(i).nextInt(max_container_cpu_usage); /*(int)Math.round(Math.random() * max_container_cpu_usage)*/
             if (load + cpuUsage <= 100) {
                 this.containers.add(new Container(cpuUsage));
             }

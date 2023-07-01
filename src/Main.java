@@ -1,9 +1,10 @@
 import utils.CsvUtils;
 
 import java.util.ArrayList;
+import java.util.Random;
 
 public class Main {
-    public static int NETWORK_SIZE = 200;
+    public static int NETWORK_SIZE = 256;
 
     public static void main(String[] args) {
         Chain chain1 = new Chain();

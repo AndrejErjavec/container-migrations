@@ -8,6 +8,7 @@ public class Network {
     public int size;
     public Chain chain;
     public Block currentBlock;
+    public Block prevBlock;
     public ArrayList<Node> nodes;
     private float loadStdDev;
     private float loadStdDevPrevBlock;
@@ -22,11 +23,12 @@ public class Network {
     public Network(int size, Chain chain) {
         this.size = size;
         this.chain = chain;
-        this.currentBlock = new Block();
+        this.currentBlock = new Block(1);
+        this.prevBlock = null;
 
         this.nodes = new ArrayList<Node>();
         for (int i = 0; i< this.size; i++) {
-            this.nodes.add(new Node());
+            this.nodes.add(new Node(i));
         }
 
         snapshot = List.copyOf(nodes);
@@ -205,12 +207,17 @@ public class Network {
             if (multiMigrationsPerBlock) { migrationPlan = generateMigrationPlan(); }
             else { migrationPlan = generateMigrationPlanOld(); }
             if (migrationPlan.size() > 0) {
-                currentBlock.addMigrationPlan(migrationPlan);
-                chain.addBlock(currentBlock);
-                currentBlock = new Block();
+                produceBlock(migrationPlan);
             }
             loadStdDev = getLoadStdDev();
         }
+    }
+
+    public void produceBlock(ArrayList<Migration> migrationPlan) {
+        currentBlock.addMigrationPlan(migrationPlan);
+        chain.addBlock(currentBlock);
+        prevBlock = currentBlock;
+        currentBlock = new Block(currentBlock.blockHeight + 1);
     }
 
     public void executeMigrationPlan() {
@@ -219,7 +226,8 @@ public class Network {
 
     private void writeMigrationsToCsv(Migration migration, Container container, String file) {
         // block, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stddevCPU, minCPU, maxCPU
-        String blockId = currentBlock.id;
+        String blockHeight = Integer.toString(currentBlock.blockHeight);
+        // String blockId = currentBlock.id;
         String sourceNode = migration.source;
         String destinationNode = migration.destination;
         String containerID = migration.container;
@@ -229,7 +237,7 @@ public class Network {
         String minCPU = Integer.toString(getMinLoadedNode(nodes).getCpuUsage());
         String maxCPU = Integer.toString(getMaxLoadedNode(nodes).getCpuUsage());
 
-        String[] line = {blockId, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stdDevCPU, minCPU, maxCPU};
+        String[] line = {blockHeight, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stdDevCPU, minCPU, maxCPU};
         CsvUtils.writeLine(line, file);
     }
 

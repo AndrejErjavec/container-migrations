@@ -3,6 +3,7 @@ import java.util.UUID;
 
 public class Block {
     public String id;
+    public int blockHeight;
     public ArrayList<Migration> migrationPlan;
 
     public Block(ArrayList<Migration> migrationPlan) {
@@ -10,8 +11,9 @@ public class Block {
         this.migrationPlan = migrationPlan;
     }
 
-    public Block() {
+    public Block(int blockHeight) {
         this.id = UUID.randomUUID().toString();
+        this.blockHeight = blockHeight;
         this.migrationPlan = new ArrayList<>();
     }
 
