@@ -6,8 +6,8 @@ migrationsMultiple = read.csv('migrations-multiple.csv')
 migrationsSingle %>% mutate(migration = row_number(), algorithm = "old") -> migrationsSingle
 migrationsMultiple %>% mutate(migration = row_number(), algorithm = "new") -> migrationsMultiple
 
-# View(migrationsSingle)
-# view(migrationsMultiple)
+view(migrationsSingle)
+view(migrationsMultiple)
 
 migrationsMultiple %>% rbind(migrationsSingle) %>% 
   ggplot() +

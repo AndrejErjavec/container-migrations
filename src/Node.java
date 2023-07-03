@@ -40,11 +40,8 @@ public class Node {
 
         long n = new Random(seed).nextInt(max_containers);
         for (int i = 0; i < n; i++) {
-            int load = 0;
-            for (int j = 0; j < this.containers.size(); j++) {
-                load += containers.get(j).getCpuUsage();
-            }
-            int cpuUsage = new Random(i).nextInt(max_container_cpu_usage); /*(int)Math.round(Math.random() * max_container_cpu_usage)*/
+            int load = getCpuUsage();
+            int cpuUsage = new Random(seed + i).nextInt(max_container_cpu_usage); /*(int)Math.round(Math.random() * max_container_cpu_usage)*/
             if (load + cpuUsage <= 100) {
                 this.containers.add(new Container(cpuUsage));
             }

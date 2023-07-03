@@ -1,0 +1,103 @@
+public Network(int size, int containers, Chain chain, int seed) {
+        this.size = size;
+        this.containers = containers;
+        this.chain = chain;
+        this.seed = seed;
+
+        this.currentBlock = new Block(1);
+        this.prevBlock = null;
+
+        this.nodes = new ArrayList<Node>();
+        int remainingContainers = this.containers;
+        for (int i = 0; i < this.size; i++) {
+            Node node = new Node(remainingContainers);
+            this.nodes.add(node);
+            remainingContainers -= node.getContainers().size();
+        }
+
+        snapshot = List.copyOf(nodes);
+        loadStdDev = this.getLoadStdDev();
+        loadStdDevPrevBlock = Float.MAX_VALUE;
+
+        String[] headers = {"block", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU"};
+        CsvUtils.initCsv(headers, csvFilePath);
+    }
+
+
+private ArrayList<Migration> generateMigrationPlan() {
+        ArrayList<Migration> migrationPlan = new ArrayList<Migration>();
+        ArrayList<Node> availableNodes = new ArrayList<>();
+        float dev = getLoadStdDev();
+        float devPrevious = getLoadStdDev();
+
+        nodes.forEach(node -> {
+            availableNodes.add(node);
+        });
+
+        // printState();
+
+        while (dev <= devPrevious && availableNodes.size() > 0) {
+            Node maxLoadedNode = getMaxLoadedNode(availableNodes);
+            Node minLoadedNode = getMinLoadedNode(availableNodes);
+
+            List<Container> migrationCandidates = maxLoadedNode.getContainers();
+            migrationCandidates.sort(new Comparator<Container>() {
+                @Override
+                public int compare(Container ct1, Container ct2) {
+                    return ct2.getCpuUsage() - ct1.getCpuUsage();
+                }
+            });
+            System.out.println("min loaded: " + minLoadedNode.getContainers().stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
+            System.out.println("max loaded: " + migrationCandidates.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
+
+            int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
+            int prevDiff = Integer.MAX_VALUE;
+
+            // find the best candidate container to migrate
+            Container toMigrate = null;
+            Migration migration = null;
+            for (int i = 0; i < migrationCandidates.size(); i++) {
+                Container candidate = migrationCandidates.get(i);
+                int nextLoadDelta = Math.abs(maxLoadedNode.getCpuUsage() - candidate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + candidate.getCpuUsage());
+                int diff = Math.abs(loadDelta - nextLoadDelta);
+
+                if (diff > prevDiff | i == migrationCandidates.size() - 1) {
+                    System.out.println("prev diff: " + prevDiff);
+                    System.out.println("diff: " + diff);
+                    System.out.println("index: " + (i - 1));
+                    // System.out.println("performing migration");
+                    takeSnapshot(nodes);
+                    // perform migration
+                    if (i > 0) toMigrate = migrationCandidates.get(i-1);
+                    else toMigrate = migrationCandidates.get(i);
+                    migration = new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
+                    migrationPlan.add(migration);
+                    simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
+                    availableNodes.remove(maxLoadedNode);
+                    availableNodes.remove(minLoadedNode);
+                    break;
+                }
+                prevDiff = diff;
+            }
+
+            devPrevious = dev;
+            dev = getLoadStdDev();
+            if (dev <= devPrevious) {
+                // System.out.println("Std dev: " + dev);
+                if(outputCSV) { writeMigrationsToCsv(migration, toMigrate, csvFilePath); }
+            }
+            else {
+                // System.out.println("Std dev extra: " + dev);
+            }
+        }
+        // System.out.println("Standard deviation before restore: " + getLoadStdDev());
+        restorePreviousState();
+        // System.out.println("Standard deviation after restore: " + getLoadStdDev());
+        System.out.println("------- END OF BLOCK -------");
+        migrationPlan.remove(migrationPlan.size()-1);
+        return migrationPlan;
+    }
+
+
+
+
