@@ -11,4 +11,5 @@ view(migrationsMultiple)
 
 migrationsMultiple %>% rbind(migrationsSingle) %>% 
   ggplot() +
+  xlim(0, 100) +
   geom_line(aes(x=migration, y=stddevCPU, group=algorithm, color=algorithm))

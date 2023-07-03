@@ -1,21 +1,23 @@
+import utils.RandomUtils;
+
 import java.sql.Array;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Node {
     public String id;
     private List<Container> containers;
-    private final static int max_containers = 10;
-    private final static int max_container_cpu_usage = 50;
+    private static final int max_containers = 10;
+    private static final int max_container_cpu_usage = 50;
+    private static final int max_cpu_usage = 100;
 
+    // for copying node
     public Node(String id, List<Container> containers) {
         this.id = id;
         this.containers = containers;
     }
 
+    // random node
     public Node() {
         this.id = UUID.randomUUID().toString();
         this.containers = new ArrayList<Container>();
@@ -34,6 +36,7 @@ public class Node {
         }
     }
 
+    // seeded node
     public Node(int seed) {
         this.id = UUID.randomUUID().toString();
         this.containers = new ArrayList<Container>();
@@ -41,11 +44,28 @@ public class Node {
         long n = new Random(seed).nextInt(max_containers);
         for (int i = 0; i < n; i++) {
             int load = getCpuUsage();
-            int cpuUsage = new Random(seed + i).nextInt(max_container_cpu_usage); /*(int)Math.round(Math.random() * max_container_cpu_usage)*/
+            int cpuUsage = new Random(seed + i).nextInt(max_container_cpu_usage);
             if (load + cpuUsage <= 100) {
                 this.containers.add(new Container(cpuUsage));
             }
             else break;
+        }
+    }
+
+    // seeded node with specified number of containers
+    public Node(int containers, int seed) {
+        this.id = UUID.randomUUID().toString();
+        this.containers = new ArrayList<Container>();
+
+        int cpuUsage = new Random(seed).nextInt(max_cpu_usage);
+        if (containers > 0) {
+            int[] cpuDistribution = RandomUtils.randomDistribution(containers, cpuUsage, seed);
+            for (int i = 0; i < containers; i++) {
+                this.containers.add(new Container(cpuDistribution[i]));
+            }
+        }
+        else {
+            this.containers.add(new Container(0));
         }
     }
 
@@ -75,9 +95,12 @@ public class Node {
         this.containers.add(container);
     }
 
+    // create node with immutable list of containers (for snapshots)
     public Node copy() {
      return new Node(this.id, List.copyOf(this.containers));
     }
+    // immutable containers back to mutable (for snapshots)
+    public Node restore() { return new Node(this.id, new ArrayList<Container>(this.getContainers())); }
 
     public void print() {
         // containers.forEach(container -> System.out.print(container.getCpuUsage() + "|"));

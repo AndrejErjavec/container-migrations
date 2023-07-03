@@ -22,7 +22,7 @@ public class Chain {
                 System.out.print("[BLOCK " + blocks.get(i).blockHeight +  " (" + blocks.get(i).migrationPlan.size() + " migrations)]---");
             }
             else{
-                System.out.println("[BLOCK" + " (" + blocks.get(i).migrationPlan.size() + " migrations)]");
+                System.out.println("[BLOCK " + blocks.get(i).blockHeight + " (" + blocks.get(i).migrationPlan.size() + " migrations)]");
             }
         }
     }
