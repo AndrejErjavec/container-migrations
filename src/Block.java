@@ -6,15 +6,10 @@ public class Block {
     public int blockHeight;
     public ArrayList<Migration> migrationPlan;
 
-    public Block(ArrayList<Migration> migrationPlan) {
-        this.id = UUID.randomUUID().toString();
-        this.migrationPlan = migrationPlan;
-    }
-
-    public Block(int blockHeight) {
+    public Block(int blockHeight, ArrayList<Migration> migrationPlan) {
         this.id = UUID.randomUUID().toString();
         this.blockHeight = blockHeight;
-        this.migrationPlan = new ArrayList<>();
+        this.migrationPlan = migrationPlan;
     }
 
     public void addMigrationPlan(ArrayList<Migration> migrationPlan) {
