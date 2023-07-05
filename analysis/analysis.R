@@ -15,16 +15,18 @@ migrationsMultipleStdDev %>% mutate(migration = row_number()) -> migrationsMulti
 migrationsSingle %>% rbind(migrationsMultipleDiff, migrationsMultipleStdDev) %>% 
   ggplot() +
   geom_line(aes(x=migration, y=stddevCPU, group=algorithm, color=algorithm)) +
-  xlim(0, 1000) +
+  scale_y_continuous(trans='log10') +
+  xlim(0, 250) +
   facet_wrap(~algorithm) +
-  theme(legend.position="none")
+  theme(legend.position="none") +
+  labs(title="Standardna deviacija CPU glede na število migracij", subtitle = "Worst case")
 
 # STDDEV ~ BLOCK
 migrationsSingle %>% rbind(migrationsMultipleDiff, migrationsMultipleStdDev) %>% 
-  group_by(algorithm, block) %>% 
-  #{summarise(stddev = min(stddevCPU));.} %>% 
   ggplot() +
   geom_line(aes(x=block, y=stddevCPU, color=algorithm)) +
+  scale_y_continuous(trans='log10') +
   xlim(0, 120) +
   facet_wrap(~algorithm) +
-  theme(legend.position="none")
+  theme(legend.position="none") +
+  labs(title="Standardna deviacija CPU glede na število blokov", subtitle = "Worst case")
