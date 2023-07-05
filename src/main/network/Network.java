@@ -8,6 +8,7 @@ import main.Configuration;
 import main.types.TestCase;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Network {
     public int size;
@@ -19,17 +20,17 @@ public class Network {
     public ArrayList<Node> nodes;
     public Block currentBlock;
 
-    private float loadStdDev;
+    // private float loadStdDev;
     // private float loadStdDevPrevBlock;
     private List<Node> snapshot;
 
     // ------- configuration -------
-    private Configuration config;
+    private final Configuration config;
     private Algorithm algorithm;
     private boolean outputCSV = false;
     private String csvFilePath;
 
-    public Network(Configuration config, Chain chain, int seed, TestCase testCase) {
+    public Network(Configuration config, Chain chain, int seed) {
         this.size = config.NETWORK_SIZE;
         this.blocks = config.BLOCKS;
         this.containers = config.CONTAINERS;
@@ -42,44 +43,37 @@ public class Network {
         for (int i = 0; i < size; i++) {
             nodes.add(new Node());
         }
-        switch (testCase) {
-            case AVERAGE -> generateAverageCase();
-            case WORST -> generateWorstCase();
-        }
-        /*
-        if (fixedContainers) {
-            int[] containerDistribution = RandomUtils.randomUniformDistribution(size, containers, seed);
-            // System.out.println("container distribution: " + Arrays.toString(containerDistribution));
-            for (int i = 0; i < size; i++) {
-                network.Node node = new network.Node(containerDistribution[i], seed + i);
-                this.nodes.add(node);
-            }
-        }
-        else {
-            for (int i = 0; i < this.size; i++) {
-                this.nodes.add(new network.Node(seed + i));
-            }
-        }
 
-         */
+        switch (config.testCase) {
+            case AVERAGE:
+                if (config.ONLINE) { generateAverageCaseOnline(); }
+                else { generateAverageCaseOffline(); }
+                break;
+            case WORST:
+                if (config.ONLINE) { generateWorstCaseOnline(); }
+                else { generateWorstCaseOffline(); }
+                break;
+        }
 
         snapshot = List.copyOf(nodes);
-        loadStdDev = this.getLoadStdDev();
+        // loadStdDev = this.getLoadStdDev();
         // loadStdDevPrevBlock = Float.MAX_VALUE;
     }
 
     // ------- test case generators -------
-    private void generateAverageCase() {
+
+    private void generateAverageCaseOffline() {
         Random r;
         for (int i = 0; i < containers; i++) {
             r = new Random((long) seed * i + i);
             int cpu = r.nextInt(config.MIN_CONTAINER_CPU, config.MAX_CONTAINER_CPU + 1);
             int node = r.nextInt(0, size);
             nodes.get(node).addContainer(new Container(cpu));
+            // System.out.println(i + " Added container with CPU " + cpu + " to node " + node);
         }
     }
 
-    private void generateWorstCase() {
+    private void generateWorstCaseOffline() {
         Random r = new Random(seed);
         int n = r.nextInt(0, size);
         Node node = nodes.get(n);
@@ -89,6 +83,35 @@ public class Network {
             node.addContainer(new Container(cpu));
         }
     }
+
+    private void generateAverageCaseOnline() {
+        if (totalContainers() + config.CONTAINERS_PER_BLOCK <= containers) {
+            Random r;
+            for (int i = 0; i < config.CONTAINERS_PER_BLOCK; i++) {
+                r = new Random((long) seed * i + i);
+                int cpu = r.nextInt(config.MIN_CONTAINER_CPU, config.MAX_CONTAINER_CPU + 1);
+                int node = r.nextInt(0, size);
+                nodes.get(node).addContainer(new Container(cpu));
+            }
+        }
+
+    }
+
+    private void generateWorstCaseOnline() {
+        if (totalContainers() + config.CONTAINERS_PER_BLOCK <= containers) {
+            Random r = new Random(seed);
+            int n = r.nextInt(0, size);
+            Node node = nodes.get(n);
+            for (int i = 0; i < config.CONTAINERS_PER_BLOCK; i++) {
+                Random r2 = new Random((long) seed * i + i);
+                int cpu = r2.nextInt(config.MIN_CONTAINER_CPU, config.MAX_CONTAINER_CPU + 1);
+                node.addContainer(new Container(cpu));
+            }
+        }
+    }
+
+
+    // ------- network load calculations -------
 
     private Node getMaxLoadedNode(ArrayList<Node> nodes) {
         Node maxLoaded = nodes.get(0);
@@ -126,6 +149,14 @@ public class Network {
             sum += Math.abs(nodes.get(i).getCpuUsage() - mean);
         }
         return sum / nodes.size();
+    }
+
+    private int totalContainers() {
+        int total = 0;
+        for (int i = 0; i < nodes.size(); i++) {
+            total += nodes.get(i).getContainers().size();
+        }
+        return total;
     }
 
     private void simulateMigration(Container ct, Node src, Node dst) {
@@ -190,16 +221,12 @@ public class Network {
         int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
         int nextLoadDelta = Math.abs((maxLoadedNode.getCpuUsage() - toMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + toMigrate.getCpuUsage()));
 
+        // System.out.println("load delta: " + loadDelta);
+        // System.out.println("next load delta: " + nextLoadDelta);
+
         while (loadDelta > nextLoadDelta && availableNodes.size() > 0) {
             // skip migration if all nodes are equally loaded
             if (minLoadedNode.equals(maxLoadedNode)) break;
-
-            // toMigrate = maxLoadedNode.getMaxLoaded();
-            // loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
-            // nextLoadDelta = Math.abs((maxLoadedNode.getCpuUsage() - toMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + toMigrate.getCpuUsage()));
-
-            // System.out.println(loadDelta);
-            // System.out.println(nextLoadDelta);
 
             // perform migration
             simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
@@ -281,8 +308,15 @@ public class Network {
         writeMigrationToCsv(null, null);
 
         for (int i = 0; i < this.blocks; i++) {
+            if (config.ONLINE) {
+                switch (config.testCase) {
+                    case AVERAGE -> generateAverageCaseOnline();
+                    case WORST -> generateWorstCaseOnline();
+                }
+            }
+
             // loadStdDevPrevBlock = loadStdDev;
-            ArrayList<Migration> migrationPlan = new ArrayList<>();
+            ArrayList<Migration> migrationPlan;
             currentBlock = chain.produceEmptyBlock();
             switch (algorithm) {
                 case SINGLE -> migrationPlan = generateMigrationPlanSingle();
@@ -292,8 +326,9 @@ public class Network {
             }
             currentBlock.addMigrationPlan(migrationPlan);
             chain.addBlock(currentBlock);
+
             // timer.schedule(new chain.ProduceBlock(migrationPlan, chain), 0, 1000);
-            loadStdDev = getLoadStdDev();
+            // loadStdDev = getLoadStdDev();
             // printState();
             // System.out.println("------------ END OF BLOCK ------------");
         }
@@ -304,9 +339,8 @@ public class Network {
     private void writeMigrationToCsv(Migration migration, Container container) {
         if (csvFilePath == null) setCSVpath("analysis/migrations.csv");
 
-        // block, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stddevCPU, minCPU, maxCPU, algorithm
         String blockHeight = (currentBlock != null) ? Integer.toString(currentBlock.blockHeight) : "0";
-        // String blockId = currentBlock.id;
+        String totalContainers = Integer.toString(totalContainers());
         String sourceNode = (migration != null && migration.source != null) ? migration.source : "";
         String destinationNode = (migration != null && migration.destination != null) ? migration.destination : "";
         String containerID = (migration != null && migration.container != null) ? migration.container : "";
@@ -316,9 +350,25 @@ public class Network {
         String minCPU = Integer.toString(getMinLoadedNode(nodes).getCpuUsage());
         String maxCPU = Integer.toString(getMaxLoadedNode(nodes).getCpuUsage());
         String algorithm = this.algorithm.toString();
+        String testCase = config.testCase.toString();
 
-        String[] line = {blockHeight, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stdDevCPU, minCPU, maxCPU, algorithm};
+        String[] line = {blockHeight, totalContainers, sourceNode, destinationNode, containerID, containerCPU, averageCPU, stdDevCPU, minCPU, maxCPU, algorithm, testCase};
         CsvUtils.writeLine(line, csvFilePath);
+    }
+
+    //  ------- configuration setters -------
+    public void setMigrationAlgorithm(Algorithm algorithm) {
+        this.algorithm = algorithm;
+    }
+
+    public void outputCSV(boolean outputCVS) {
+        this.outputCSV = outputCVS;
+    }
+
+    public void setCSVpath(String path) {
+        this.csvFilePath = path;
+        String[] headers = {"block", "totalContainers", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU", "algorithm", "testCase"};
+        CsvUtils.initCsv(headers, csvFilePath);
     }
 
     public void printState() {
@@ -334,18 +384,11 @@ public class Network {
         System.out.println("Std dev: " + getLoadStdDev());
     }
 
-    //  ------- configuration setters -------
-    public void setMigrationAlgorithm(Algorithm algorithm) {
-        this.algorithm = algorithm;
+    public void printNodesCpu() {
+        System.out.println(nodes.stream().map(node -> node.getCpuUsage()).collect(Collectors.toList()));
     }
 
-    public void outputCSV(boolean outputCVS) {
-        this.outputCSV = outputCVS;
-    }
-
-    public void setCSVpath(String path) {
-        this.csvFilePath = path;
-        String[] headers = {"block", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU", "algorithm"};
-        CsvUtils.initCsv(headers, csvFilePath);
+    public void printNodesContainers() {
+        System.out.println(nodes.stream().map(node -> node.getContainers().size()).collect(Collectors.toList()));
     }
 }
