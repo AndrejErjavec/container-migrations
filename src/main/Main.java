@@ -14,6 +14,7 @@ public class Main {
         int seed = r.nextInt(128);
         System.out.println("seed: " + seed);
 
+
         System.out.println("single");
         Chain chain1 = new Chain();
         Network n1 = new Network(config, chain1, seed, TestCase.WORST);
@@ -40,5 +41,6 @@ public class Main {
         n3.setCSVpath("analysis/migrations-multiple-stddev.csv");
         n3.run();
         chain3.print();
+
     }
 }

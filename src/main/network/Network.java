@@ -70,8 +70,9 @@ public class Network {
 
     // ------- test case generators -------
     private void generateAverageCase() {
-        Random r = new Random(seed);
+        Random r;
         for (int i = 0; i < containers; i++) {
+            r = new Random((long) seed * i + i);
             int cpu = r.nextInt(config.MIN_CONTAINER_CPU, config.MAX_CONTAINER_CPU + 1);
             int node = r.nextInt(0, size);
             nodes.get(node).addContainer(new Container(cpu));
@@ -80,10 +81,12 @@ public class Network {
 
     private void generateWorstCase() {
         Random r = new Random(seed);
-        int node = r.nextInt(0, size);
+        int n = r.nextInt(0, size);
+        Node node = nodes.get(n);
         for (int i = 0; i < containers; i++) {
-            int cpu = r.nextInt(config.MIN_CONTAINER_CPU, config.MAX_CONTAINER_CPU + 1);
-            nodes.get(node).addContainer(new Container(cpu));
+            Random r2 = new Random((long) seed * i + i);
+            int cpu = r2.nextInt(config.MIN_CONTAINER_CPU, config.MAX_CONTAINER_CPU + 1);
+            node.addContainer(new Container(cpu));
         }
     }
 
@@ -191,22 +194,33 @@ public class Network {
             // skip migration if all nodes are equally loaded
             if (minLoadedNode.equals(maxLoadedNode)) break;
 
+            // toMigrate = maxLoadedNode.getMaxLoaded();
+            // loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
+            // nextLoadDelta = Math.abs((maxLoadedNode.getCpuUsage() - toMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + toMigrate.getCpuUsage()));
+
+            // System.out.println(loadDelta);
+            // System.out.println(nextLoadDelta);
+
+            // perform migration
+            simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
+            availableNodes.remove(minLoadedNode);
+            // availableNodes.remove(maxLoadedNode);
+            Migration migration = new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
+            migrationPlan.add(migration);
+            if (outputCSV) { writeMigrationToCsv(migration, toMigrate); }
+
+            // calculate next migration
+            maxLoadedNode = getMaxLoadedNode(nodes);
+            minLoadedNode = getMinLoadedNode(availableNodes);
             toMigrate = maxLoadedNode.getMaxLoaded();
+
             loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
             nextLoadDelta = Math.abs((maxLoadedNode.getCpuUsage() - toMigrate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + toMigrate.getCpuUsage()));
 
-            // perform migration
-            if (loadDelta > nextLoadDelta) {
-                simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
-                availableNodes.remove(maxLoadedNode);
-                availableNodes.remove(minLoadedNode);
-                Migration migration = new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
-                migrationPlan.add(migration);
-                if (outputCSV) { writeMigrationToCsv(migration, toMigrate); }
-
-                maxLoadedNode = getMaxLoadedNode(availableNodes);
-                minLoadedNode = getMinLoadedNode(availableNodes);
-            }
+            // System.out.println("max loaded: " + maxLoadedNode.getCpuUsage());
+            // System.out.println("min loaded: " + minLoadedNode.getCpuUsage());
+            // System.out.println("load delta: " + loadDelta);
+            // System.out.println("next load delta: " + nextLoadDelta);
         }
 
         if (outputCSV && !(migrationPlan.size() > 0)) { writeMigrationToCsv(null, null); }
@@ -227,7 +241,7 @@ public class Network {
         float devPrevious = dev;
 
         while (dev <= devPrevious && availableNodes.size() > 0) {
-            Node maxLoadedNode = getMaxLoadedNode(availableNodes);
+            Node maxLoadedNode = getMaxLoadedNode(nodes);
             Node minLoadedNode = getMinLoadedNode(availableNodes);
             // skip migration if all nodes are equally loaded
             if (minLoadedNode.equals(maxLoadedNode)) break;
@@ -236,8 +250,8 @@ public class Network {
 
             // perform migration
             simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
-            availableNodes.remove(maxLoadedNode);
             availableNodes.remove(minLoadedNode);
+            // availableNodes.remove(maxLoadedNode);
 
             // calculate standard deviation after migration
             devPrevious = dev;
@@ -258,6 +272,8 @@ public class Network {
         if (outputCSV && !(migrationPlan.size() > 0)) { writeMigrationToCsv(null, null); }
         return migrationPlan;
     }
+
+    // ========== main loop ==========
 
     public void run() {
         // Timer timer = new Timer();
