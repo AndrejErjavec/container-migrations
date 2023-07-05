@@ -1,6 +1,6 @@
-import java.lang.reflect.Array;
+package main.blockchain;
+
 import java.util.ArrayList;
-import java.util.TimerTask;
 
 public class Chain {
     private ArrayList<Block> blocks;

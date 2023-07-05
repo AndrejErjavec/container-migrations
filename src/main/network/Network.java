@@ -1,10 +1,13 @@
-import utils.CsvUtils;
-import utils.RandomUtils;
+package main.network;
 
-import java.sql.Array;
-import java.sql.SQLOutput;
+import main.blockchain.Block;
+import main.blockchain.Chain;
+import main.types.Algorithm;
+import main.utils.CsvUtils;
+import main.Configuration;
+import main.types.TestCase;
+
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class Network {
     public int size;
@@ -48,13 +51,13 @@ public class Network {
             int[] containerDistribution = RandomUtils.randomUniformDistribution(size, containers, seed);
             // System.out.println("container distribution: " + Arrays.toString(containerDistribution));
             for (int i = 0; i < size; i++) {
-                Node node = new Node(containerDistribution[i], seed + i);
+                network.Node node = new network.Node(containerDistribution[i], seed + i);
                 this.nodes.add(node);
             }
         }
         else {
             for (int i = 0; i < this.size; i++) {
-                this.nodes.add(new Node(seed + i));
+                this.nodes.add(new network.Node(seed + i));
             }
         }
 
@@ -273,7 +276,7 @@ public class Network {
             }
             currentBlock.addMigrationPlan(migrationPlan);
             chain.addBlock(currentBlock);
-            // timer.schedule(new ProduceBlock(migrationPlan, chain), 0, 1000);
+            // timer.schedule(new chain.ProduceBlock(migrationPlan, chain), 0, 1000);
             loadStdDev = getLoadStdDev();
             // printState();
             // System.out.println("------------ END OF BLOCK ------------");
@@ -304,7 +307,7 @@ public class Network {
 
     public void printState() {
         for (int i = 0; i < nodes.size(); i++) {
-            System.out.print("Node " + i + ": ");
+            System.out.print("network.Node " + i + ": ");
             nodes.get(i).print();
         }
         System.out.println("Std dev: " + getLoadStdDev());

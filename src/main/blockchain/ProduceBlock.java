@@ -1,3 +1,7 @@
+package main.blockchain;
+
+import main.network.Migration;
+
 import java.util.ArrayList;
 import java.util.TimerTask;
 

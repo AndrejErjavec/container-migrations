@@ -1,3 +1,5 @@
+package main.network;
+
 public class Migration {
     public String container;
     public String source;
@@ -10,6 +12,6 @@ public class Migration {
     }
 
     public void print() {
-        System.out.println("CT: " + container + " | " + source + " --> Node: " + destination);
+        System.out.println("CT: " + container + " | " + source + " --> network.Node: " + destination);
     }
 }

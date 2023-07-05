@@ -1,25 +1,25 @@
-private ArrayList<Migration> generateMigrationPlanMultiStdDev() {
-        ArrayList<Migration> migrationPlan = new ArrayList<Migration>();
+private ArrayList<network.Migration> generateMigrationPlanMultiStdDev() {
+        ArrayList<network.Migration> migrationPlan = new ArrayList<network.Migration>();
         float dev = getLoadStdDev();
         float devPrevious = dev;
 
-        ArrayList<Node> availableNodes = new ArrayList<>(nodes);
+        ArrayList<network.Node> availableNodes = new ArrayList<>(nodes);
 
         // System.out.println("INITIAL STATE");
         // printState();
         // printStdDev();
 
         while (dev <= devPrevious && availableNodes.size() > 0) {
-            Node maxLoadedNode = getMaxLoadedNode(availableNodes);
-            Node minLoadedNode = getMinLoadedNode(availableNodes);
+            network.Node maxLoadedNode = getMaxLoadedNode(availableNodes);
+            network.Node minLoadedNode = getMinLoadedNode(availableNodes);
 
             // skip migration if all nodes are equally loaded
             if(minLoadedNode.equals(maxLoadedNode)) break;
 
-            List<Container> migrationCandidates = maxLoadedNode.getContainers();
-            migrationCandidates.sort(new Comparator<Container>() {
+            List<network.Container> migrationCandidates = maxLoadedNode.getContainers();
+            migrationCandidates.sort(new Comparator<network.Container>() {
                 @Override
-                public int compare(Container ct1, Container ct2) {
+                public int compare(network.Container ct1, network.Container ct2) {
                     return ct1.getCpuUsage() - ct2.getCpuUsage();
                 }
             });
@@ -29,9 +29,9 @@ private ArrayList<Migration> generateMigrationPlanMultiStdDev() {
             int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
 
             // find the best candidate container to migrate
-            Container toMigrate = null;
+            network.Container toMigrate = null;
             for (int i = 0; i < migrationCandidates.size(); i++) {
-                Container candidate = migrationCandidates.get(i);
+                network.Container candidate = migrationCandidates.get(i);
                 int nextLoadDelta = Math.abs((maxLoadedNode.getCpuUsage() - candidate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + candidate.getCpuUsage()));
                 if (nextLoadDelta > loadDelta) {
                     if (i > 0) toMigrate = migrationCandidates.get(i-1);
@@ -53,13 +53,13 @@ private ArrayList<Migration> generateMigrationPlanMultiStdDev() {
             // calculate standard deviation after migration
             devPrevious = dev;
             dev = getLoadStdDev();
-            Migration migration = new Migration(null, null, null);
+            network.Migration migration = new network.Migration(null, null, null);
             // System.out.println("dev: " + dev);
             // System.out.println("dev previous: " + devPrevious);
             if (dev < devPrevious) {
                 // System.out.println("Std dev: " + dev);
                 takeSnapshot(nodes);
-                migration = new Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
+                migration = new network.Migration(toMigrate.id, maxLoadedNode.id, minLoadedNode.id);
                 migrationPlan.add(migration);
                 if (outputCSV) { writeMigrationToCsv(migration, toMigrate); }
             }

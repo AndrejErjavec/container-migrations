@@ -1,3 +1,10 @@
+package main;
+
+import main.blockchain.Chain;
+import main.network.Network;
+import main.types.Algorithm;
+import main.types.TestCase;
+
 import java.util.Random;
 
 public class Main {

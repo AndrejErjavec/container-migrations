@@ -1,3 +1,5 @@
+package main;
+
 public class Configuration {
     public int NETWORK_SIZE = 256;
     public int CONTAINERS = 1000;
