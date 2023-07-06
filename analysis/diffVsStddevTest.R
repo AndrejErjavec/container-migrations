@@ -12,7 +12,7 @@ migrationsMultipleDiff %>% rbind(migrationsMultipleStddev) %>%
   ggplot() +
   geom_line(aes(x=block, y=stddevCPU, color=algorithm)) +
   scale_y_continuous(trans='log10') +
-  xlim(0, 50) +
+  xlim(0, 100) +
   facet_wrap(~algorithm) +
   theme(legend.position="none") +
   labs(title="Standardna deviacija CPU glede na število blokov", subtitle = paste("test case", testCase))

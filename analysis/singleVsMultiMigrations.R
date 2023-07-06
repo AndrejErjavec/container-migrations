@@ -9,7 +9,7 @@ migrationsSingle %>% rbind(migrationsMultiple) %>%
   ggplot() +
   geom_line(aes(x=block, y=stddevCPU, color=algorithm)) +
   scale_y_continuous(trans='log10') +
-  xlim(0, 200) +
+  xlim(0, 1000) +
   facet_wrap(~algorithm) +
   theme(legend.position="none") +
   labs(title="Standardna deviacija CPU glede na število blokov", subtitle = paste("test case", testCase))
