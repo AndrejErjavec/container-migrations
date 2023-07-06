@@ -27,8 +27,20 @@ public class Network {
     // ------- configuration -------
     private final Configuration config;
     private Algorithm algorithm;
+    private boolean improved;
     private boolean outputCSV = false;
     private String csvFilePath;
+
+    // completely unloaded network for testing
+    public Network(Configuration config) {
+        this.config = config;
+        this.size = config.NETWORK_SIZE;
+        this.nodes = new ArrayList<Node>();
+
+        for (int i = 0; i < size; i++) {
+            nodes.add(new Node());
+        }
+    }
 
     public Network(Configuration config, Chain chain, int seed) {
         this.size = config.NETWORK_SIZE;
@@ -60,7 +72,7 @@ public class Network {
         // loadStdDevPrevBlock = Float.MAX_VALUE;
     }
 
-    // ------- test case generators -------
+    /////////////////////// TEST CASE GENERATORS //////////////////////
 
     private void generateAverageCaseOffline() {
         Random r;
@@ -111,9 +123,9 @@ public class Network {
     }
 
 
-    // ------- network load calculations -------
+    /////////////////////// NETWORK LOAD CALCULATIONS //////////////////////
 
-    private Node getMaxLoadedNode(ArrayList<Node> nodes) {
+    public Node getMaxLoadedNode(ArrayList<Node> nodes) {
         Node maxLoaded = nodes.get(0);
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).getCpuUsage() > maxLoaded.getCpuUsage()) {
@@ -123,7 +135,7 @@ public class Network {
         return maxLoaded;
     }
 
-    private Node getMinLoadedNode(ArrayList<Node> nodes) {
+    public Node getMinLoadedNode(ArrayList<Node> nodes) {
         Node minLoaded = nodes.get(0);
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).getCpuUsage() < minLoaded.getCpuUsage()) {
@@ -134,7 +146,7 @@ public class Network {
         return minLoaded;
     }
 
-    private float getAverageLoad() {
+    public float getAverageLoad() {
         float sum = 0;
         for (int i = 0; i < nodes.size(); i++) {
             sum += nodes.get(i).getCpuUsage();
@@ -142,7 +154,7 @@ public class Network {
         return sum / nodes.size();
     }
 
-    private float getLoadStdDev() {
+    public float getLoadStdDev() {
         float sum = 0;
         float mean = getAverageLoad();
         for (int i = 0; i < nodes.size(); i++) {
@@ -178,7 +190,7 @@ public class Network {
         });
     }
 
-    // ------- algorithms -------
+    /////////////////////// ALGORITHMS //////////////////////
 
     /**
      * exsisting migration plan algorithm
@@ -211,7 +223,7 @@ public class Network {
      * uses difference between min and max loaded node
      */
 
-    private ArrayList<Migration> generateMigrationPlanMultiDiff() {
+    private ArrayList<Migration> generateMigrationPlanMultiDiff(boolean improvedSearch) {
         ArrayList<Migration> migrationPlan = new ArrayList<Migration>();
         ArrayList<Node> availableNodes = new ArrayList<>(nodes);
         Node maxLoadedNode = getMaxLoadedNode(nodes);
@@ -227,6 +239,36 @@ public class Network {
         while (loadDelta > nextLoadDelta && availableNodes.size() > 0) {
             // skip migration if all nodes are equally loaded
             if (minLoadedNode.equals(maxLoadedNode)) break;
+
+            // improved search
+            if (improvedSearch) {
+                List<Container> migrationCandidates = maxLoadedNode.getContainers();
+                migrationCandidates.sort(new Comparator<Container>() {
+                    @Override
+                    public int compare(Container ct1, Container ct2) {
+                        return ct1.getCpuUsage() - ct2.getCpuUsage();
+                    }
+                });
+
+                // System.out.println(migrationCandidates.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
+                int current = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
+
+                // find the best candidate container to migrate
+                for (int i = 0; i < migrationCandidates.size(); i++) {
+                    Container candidate = migrationCandidates.get(i);
+                    int next = Math.abs((maxLoadedNode.getCpuUsage() - candidate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + candidate.getCpuUsage()));
+                    if (next > current) {
+                        if (i > 0) toMigrate = migrationCandidates.get(i-1);
+                        else toMigrate = migrationCandidates.get(i);
+                        break;
+                    }
+                    if (i == migrationCandidates.size() - 1) {
+                        toMigrate = migrationCandidates.get(i);
+                        break;
+                    }
+                    current = next;
+                }
+            }
 
             // perform migration
             simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
@@ -261,7 +303,7 @@ public class Network {
      * uses standard deviation
      */
 
-    private ArrayList<Migration> generateMigrationPlanMultiStdDev() {
+    private ArrayList<Migration> generateMigrationPlanMultiStdDev(boolean improvedSearch) {
         ArrayList<Migration> migrationPlan = new ArrayList<Migration>();
         ArrayList<Node> availableNodes = new ArrayList<>(nodes);
         float dev = getLoadStdDev();
@@ -274,6 +316,37 @@ public class Network {
             if (minLoadedNode.equals(maxLoadedNode)) break;
 
             Container toMigrate = maxLoadedNode.getMaxLoaded();
+
+            // improved search
+            if (improvedSearch) {
+                List<Container> migrationCandidates = maxLoadedNode.getContainers();
+                migrationCandidates.sort(new Comparator<Container>() {
+                    @Override
+                    public int compare(Container ct1, Container ct2) {
+                        return ct1.getCpuUsage() - ct2.getCpuUsage();
+                    }
+                });
+
+                // System.out.println(migrationCandidates.stream().map(container -> container.getCpuUsage()).collect(Collectors.toList()));
+
+                int loadDelta = maxLoadedNode.getCpuUsage() - minLoadedNode.getCpuUsage();
+
+                // find the best candidate container to migrate
+                for (int i = 0; i < migrationCandidates.size(); i++) {
+                    Container candidate = migrationCandidates.get(i);
+                    int nextLoadDelta = Math.abs((maxLoadedNode.getCpuUsage() - candidate.getCpuUsage()) - (minLoadedNode.getCpuUsage() + candidate.getCpuUsage()));
+                    if (nextLoadDelta > loadDelta) {
+                        if (i > 0) toMigrate = migrationCandidates.get(i-1);
+                        else toMigrate = migrationCandidates.get(i);
+                        break;
+                    }
+                    if (i == migrationCandidates.size() - 1) {
+                        toMigrate = migrationCandidates.get(i);
+                        break;
+                    }
+                    loadDelta = nextLoadDelta;
+                }
+            }
 
             // perform migration
             simulateMigration(toMigrate, maxLoadedNode, minLoadedNode);
@@ -300,7 +373,7 @@ public class Network {
         return migrationPlan;
     }
 
-    // ========== main loop ==========
+    /////////////////////// MAIN LOOP //////////////////////
 
     public void run() {
         // Timer timer = new Timer();
@@ -320,8 +393,10 @@ public class Network {
             currentBlock = chain.produceEmptyBlock();
             switch (algorithm) {
                 case SINGLE -> migrationPlan = generateMigrationPlanSingle();
-                case MULTI_DIFF -> migrationPlan = generateMigrationPlanMultiDiff();
-                case MULTI_STDDEV -> migrationPlan = generateMigrationPlanMultiStdDev();
+                case MULTI_DIFF -> migrationPlan = generateMigrationPlanMultiDiff(false);
+                case MULTI_DIFF_IMPROVED -> migrationPlan = generateMigrationPlanMultiDiff(true);
+                case MULTI_STDDEV -> migrationPlan = generateMigrationPlanMultiStdDev(false);
+                case MULTI_STDDEV_IMPROVED -> migrationPlan = generateMigrationPlanMultiStdDev(true);
                 default -> migrationPlan = new ArrayList<>();
             }
             currentBlock.addMigrationPlan(migrationPlan);
@@ -356,7 +431,20 @@ public class Network {
         CsvUtils.writeLine(line, csvFilePath);
     }
 
-    //  ------- configuration setters -------
+    public ArrayList<Container> getAllContainers() {
+        ArrayList<Container> out = new ArrayList<>();
+        nodes.forEach(node -> {
+            out.addAll(node.getContainers());
+        });
+        return out;
+    }
+
+    public Configuration getConfig() {
+        return this.config;
+    }
+
+    /////////////////////// CONFIGURATION SETTERS //////////////////////
+
     public void setMigrationAlgorithm(Algorithm algorithm) {
         this.algorithm = algorithm;
     }
@@ -370,6 +458,8 @@ public class Network {
         String[] headers = {"block", "totalContainers", "sourceNode", "destinationNode", "containerID", "containerCPU", "averageCPU", "stddevCPU", "minCPU", "maxCPU", "algorithm", "testCase"};
         CsvUtils.initCsv(headers, csvFilePath);
     }
+
+    /////////////////////// PRINTING //////////////////////
 
     public void printState() {
         for (int i = 0; i < nodes.size(); i++) {
