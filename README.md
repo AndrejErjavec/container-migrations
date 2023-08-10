@@ -3,5 +3,5 @@ This simulation was created to support testing of new improved implementations o
 
 Three new algorithms provide the following improvements:
 * multiple migrations per block
-* improved selection of container to migrate
-* usage of standard deviation of CPU usage as a measure for network stability
+* improved selection of containers to migrate
+* use of standard deviation of CPU usage distribution as a measure of network stability
